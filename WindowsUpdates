@@ -1,0 +1,31 @@
+$cred = Get-Credential
+$moduledir = '.\PSWindowsUpdate'
+$servers = .\servers.txt
+$import = Import-Module '.\PSWindowsUpdate\PSWindowsUpdate.psm1'
+$destinationfolder = $env:TEMP
+
+foreach($server in $servers){
+    $session = NEw-PSSession -ComputerName $server -Credential $cred
+
+    # create temp dir if it does not exist
+    Invoke-Command -Session $session -ScriptBlock{
+        if(!(Test-Path -Path $Using:destinationfolder)){
+            New-Item -Path $Using:destinationfolder -ItemType Directory
+        }
+    }
+
+    # copy module dir to remote server
+    Copy-Item -Path $moduledir -Destination $destinationfolder -ToSession $session
+
+    # import module on remote server
+    Invoke-Command -Session $session -ScriptBlock{
+        Import-Module "$destinationfolder\$import"
+        Get-WUList -ComputerName 
+    }
+
+    # remove temp dir after updates are complete.
+    Invoke-Command -Session $session -ScriptBlock{
+        Remove-Item -Path "$Using:destinationfolder\$Using:moduledir"
+    }
+}
+
